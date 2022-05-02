@@ -1,4 +1,6 @@
 PORT = 7697
+SERVER_IP = 127.0.0.1
+ID = "client"
 
 build: server subscriber
 
@@ -12,7 +14,7 @@ run_server:
 	./server ${PORT}
 
 run_subscriber:
-	./subscriber ${PORT}
+	./subscriber ${ID} ${SERVER_IP} ${PORT} 
 
 clean:
 	rm -rf *.o server subscriber

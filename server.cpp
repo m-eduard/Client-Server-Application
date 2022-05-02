@@ -1,12 +1,14 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 
+#include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -18,10 +20,33 @@ using namespace std;
 #define MAX_CLIENTS 1000
 #define HOST_IP     "127.0.0.1"
 
+struct client_t {
+    int name;
+};
+
 void run_server(int tcp_sock, int udp_sock) {
     long long bits_received = 0;
 
     // int status = select(100000, read, write, NULL, NULL);
+}
+
+
+bool receive_msg(int sock_fd, char *message) {
+    bool status = true;
+
+    char buffer[MAX_LEN] = {0};
+    int sz = recv(sock_fd, buffer, sizeof(buffer) - 1, 0);
+
+    if (sz == 0) {
+        status = false;
+    } else {
+        uint32_t msg_len;
+        memcpy(&msg_len, buffer, MSG_LEN_SIZE);
+
+        memcpy(message, buffer + MSG_LEN_SIZE, msg_len);
+    }
+    
+    return status;
 }
 
 int main(int argc, char *argv[]) {
@@ -33,12 +58,16 @@ int main(int argc, char *argv[]) {
     }
 
     int udp_sock_fd, tcp_sock_fd, new_sock_fd;
-    string buffer;
+    char buffer[MAX_LEN];
     sockaddr_in serv_addr;
+    sockaddr_in client_addr;
+    socklen_t client_addr_size;
 
     fd_set read_fds;
     fd_set tmp_fds;
     int fd_max;
+
+    unordered_map<int, client_t> clients;
 
     // Open 2 sockets (one for UDP transmissions,
     // and one for the TCP connections)
@@ -116,7 +145,30 @@ int main(int argc, char *argv[]) {
                 } else if (i == udp_sock_fd) {  // message from a UDP client
 
                 } else if (i == tcp_sock_fd) {  // connection request
+                    client_addr_size = sizeof(client_addr);
+                    new_sock_fd = accept(tcp_sock_fd,
+                                    (sockaddr *) &client_addr, &client_addr_size);
 
+                    if (new_sock_fd < 0) {
+                        cerr << "accept() failed\n";
+                        continue;
+                    }
+
+                    // Add the new file descriptor to the used fd-s set
+                    FD_SET(new_sock_fd, &read_fds);
+                    fd_max = max(fd_max, new_sock_fd);
+
+                    // Get the client ID
+                    if (!receive_msg(new_sock_fd, buffer)) {
+                        cerr << "skipped new client, since "
+                                "ID wasn't received)\n";
+                        continue;
+                    }
+
+                    // Map the client to the file descriptor associated
+                    clients[new_sock_fd] = {1};
+
+                    cout << "New client " << buffer << " connected from " << inet_ntoa(client_addr.sin_addr) << ":" << client_addr.sin_port << '\n';
                 } else {                        // message from a TCP client
                     
                 }

@@ -25,10 +25,10 @@ bool send_message(int sock_fd, const char *message) {
     char buffer[MAX_LEN];
     uint32_t message_len = strlen(message) + 1;
 
-    memcpy(buffer, &message_len, MSG_SIZE_LEN);
-    snprintf(buffer + MSG_SIZE_LEN, strlen(message) + 1, "%s", message);
+    memcpy(buffer, &message_len, MSG_LEN_SIZE);
+    snprintf(buffer + MSG_LEN_SIZE, strlen(message) + 1, "%s", message);
 
-    ret = send(sock_fd, buffer, MSG_SIZE_LEN + message_len, 0);
+    ret = send(sock_fd, buffer, MSG_LEN_SIZE + message_len, 0);
     if (ret < 0) {
         status = false;
     }
