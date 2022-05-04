@@ -24,12 +24,36 @@ using namespace std;
 struct client_t {
     string id_client;
     bool active;
+    int fd;
 
     client_t() {}
     client_t(string id) : id_client(id), active(true) {}
-    client_t(string id, bool x) : id_client(id), active(x) {}
+    client_t(string id, bool x, int fd) : id_client(id), active(x), fd(fd) {}
 };
 
+pair<string, uint8_t> decode_subscribe_msg(char *msg) {
+    char cmd[MAX_CMD_LEN];
+    char topic[BUF_LEN / 2];
+    uint8_t sf;
+
+    // The @msg containing the command will respect
+    // the format and sscanf will be always successful,
+    // because the @msg was formatted in the TCP client.
+    sscanf(msg, "%s%s%hhd", cmd, topic, &sf);
+
+    return {string(topic), sf};
+}
+
+string decode_unsubscribe_msg(char *msg) {
+    char cmd[MAX_CMD_LEN];
+    char topic[BUF_LEN / 2];
+
+    // The @msg containing the command will respect
+    // the format.
+    sscanf(msg, "%s%s", cmd, topic);
+
+    return string(topic);
+}
 
 int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
@@ -51,24 +75,24 @@ int main(int argc, char *argv[]) {
     int fd_max;
 
     // key:     socket file descriptor associated to client
-    // value:   data about the client
-    unordered_map<int, client_t> clients;
+    // value:   client ID
+    unordered_map<int, string> clients;
 
     // map every message to the tcp clients to the messages that it has to receive
     // after reconnecting to the server
     unordered_map<message, vector<client_t>> queued_messages();
 
-    // Set of id-s used by the clients that were
-    // connected to the server at least once
-    unordered_set<string> used_clients_ids;
+    // Map of id-s used by the clients that were
+    // connected to the server at least once,
+    // associated to their structure
+    unordered_map<string, client_t> used_ids;
 
     // key:     string representing the topic name
-    // value:   2 lists of file descriptors associated to clients
-    //          that are subscribed to the given topic (one for
-    //          the clients with sf=0 on that topic, and one for
-    //          those with sf=1)
-    // unordered_map<string, pair<vector<int>, vector<int>>> topics;
-    // unordered_map<string, >
+    // value:   map, where the keys are the clients
+    //          subscribed to a specific topic, and
+    //          the value is 0/1, according to their
+    //          sf status
+    unordered_map<string, unordered_map<string, bool>> topics;
 
 
     // Open 2 sockets (one for UDP transmissions,
@@ -164,16 +188,14 @@ int main(int argc, char *argv[]) {
 
                     // Map the client to the file descriptor associated,
                     // only if the id is not currently used
-                    if (connected_clients_id.find(client_id)
-                        == connected_clients_id.end())
-                    {
+                    if (used_ids.find(client_id) == used_ids.end()) {
                         cout << "New client " << client_id << " connected from "
                              << inet_ntoa(client_addr.sin_addr) << ":"
                              << client_addr.sin_port << '\n';
                         send_message(new_sock_fd, ACC);
 
-                        connected_clients_id.insert(client_id);
-                        clients[new_sock_fd] = client_t(client_id);
+                        used_ids[client_id] = client_t(client_id, true, new_sock_fd);
+                        clients[new_sock_fd] = client_id;
                     } else {
                         cout << "Client " << client_id << " already connected.\n";
                         send_message(new_sock_fd, REJ);
@@ -190,19 +212,20 @@ int main(int argc, char *argv[]) {
                     
                     if (ret == 0) {
                         clients.erase(i);
-                        cout << "Client disconnected";
+                        cout << "Client disconnected.\n";
                         FD_CLR(i, &read_fds);
                     } else {
-                        ret = receive_message(i, buffer);
+                        if (!strncmp(buffer, "subscribe", 9)) {
+                            pair<string, uint8_t> args = decode_subscribe_msg(buffer);
 
-                        if (ret < 0) {
-                            cerr << "receive_message() failed\n";
-                            continue;
+                            // Associate the new topic to the client
+                            topics[args.first][clients[i]] = args.second;
+                        } else if (!strncmp(buffer, "unsubscribe", 11)) {
+                            string topic = decode_unsubscribe_msg(buffer);
+
+                            // Delete the client from the topic's subscribers
+                            topics[topic].erase(clients[i]);
                         }
-
-                        cout << buffer << '\n';;
-
-                        // cout << parse_server_msg(buffer);
                     }
                 }
             }
@@ -212,9 +235,6 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
-
-
-
 
     close(tcp_sock_fd);
     close(udp_sock_fd);

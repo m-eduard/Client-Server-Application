@@ -20,14 +20,14 @@ using namespace std;
 string parse_subscribe_cmd(char *msg) {    
     char cmd[MAX_CMD_LEN];
     char topic[BUF_LEN / 2];
-    int sf;
+    uint8_t sf;
 
     char parsed_msg[BUF_LEN] = {0};
 
-    if (sscanf(msg, "%s%s%d", cmd, topic, &sf) != 3) {
+    if (sscanf(msg, "%s%s%hhd", cmd, topic, &sf) != 3) {
         cerr << "Subscribe format: \"subscribe <TOPIC> <SF>\"\n";
     } else {
-        sprintf(parsed_msg, "%s %s %d", cmd, topic, sf);
+        sprintf(parsed_msg, "%s %s %hhd", cmd, topic, sf);
     }
 
     return string(parsed_msg);
@@ -151,7 +151,6 @@ int main(int argc, char *argv[]) {
                 break;
             } else if (!strncmp(buffer, "subscribe ", 10)) {
                 string msg = parse_subscribe_cmd(buffer);
-                cout << msg << '\n';
 
                 if (msg.size() > 0) {
                     ret = send_message(sock_fd, msg.c_str());
