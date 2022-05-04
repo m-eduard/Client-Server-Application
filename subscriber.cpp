@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
     fd_max = sock_fd;
 
     // Send the client identification info to the server
-    ret = send_message(sock_fd, client_id);
+    ret = send_message(sock_fd, client_id, -1);
     DIE(ret < 0, "Sending client ID failed");
 
     // Receive the server response (accept or reject)
@@ -148,12 +148,16 @@ int main(int argc, char *argv[]) {
             }
 
             if (!strncmp(buffer, "exit", 4)) {
+                if (ret < 0) {
+                    cerr << "Sending end request to the server failed\n";
+                }
+
                 break;
             } else if (!strncmp(buffer, "subscribe ", 10)) {
                 string msg = parse_subscribe_cmd(buffer);
 
                 if (msg.size() > 0) {
-                    ret = send_message(sock_fd, msg.c_str());
+                    ret = send_message(sock_fd, msg.c_str(), -1);
 
                     if (ret < 0) {
                         cerr << "Sending subscribe cmd to the server failed\n";
@@ -165,7 +169,7 @@ int main(int argc, char *argv[]) {
                 string msg = parse_unsubscribe_cmd(buffer);
 
                 if (msg.size() > 0) {
-                    ret = send_message(sock_fd, msg.c_str());
+                    ret = send_message(sock_fd, msg.c_str(), -1);
 
                     if (ret < 0) {
                         cerr << "Sending unsubscribe cmd to the server failed";
@@ -187,16 +191,13 @@ int main(int argc, char *argv[]) {
                 // Connection was closed
                 cout << "Server is down\n";
                 break;
-            } else {
-                ret = receive_message(sock_fd, buffer);
-
-                if (ret < 0) {
-                    cerr << "receive_message() failed\n";
-                    continue;
-                }
-
-                cout << parse_server_msg(buffer);
             }
+
+            // cout << parse_server_msg(buffer);
+            cout << inet_ntoa({((message *) buffer)->ip}) << '\n';
+            cout << ((message *) buffer)->port << '\n';
+            cout << (int)(((message *) buffer)->type) << '\n';
+            cout << '$' << '\n';
         }
     }
 

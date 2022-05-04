@@ -136,8 +136,9 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&read_fds);
     FD_ZERO(&tmp_fds);
     FD_SET(tcp_sock_fd, &read_fds);
+    FD_SET(udp_sock_fd, &read_fds);
     FD_SET(STDIN_FILENO, &read_fds);
-	fd_max = tcp_sock_fd;
+	fd_max = max(tcp_sock_fd, udp_sock_fd);
 
     while (true) {
         bool sig_exit = false;
@@ -161,7 +162,46 @@ int main(int argc, char *argv[]) {
                         break;
                     }
                 } else if (i == udp_sock_fd) {  // message from a UDP client
+                    memset(buffer, sizeof(buffer), 0);
+                    ret = recvfrom(udp_sock_fd, buffer, sizeof(buffer) - 1, 0,
+                                    (sockaddr *) &client_addr, &client_addr_size);
 
+                    if (ret < 0) {
+                        cerr << "Reading from UDP socket failed\n";
+                        continue;
+                    }
+
+                    cout << "Received: " << buffer << '\n';
+
+                    char topic[TOPIC_LEN + 1] = {0};
+                    memcpy(topic, buffer, TOPIC_LEN);
+                    uint8_t type;
+                    memcpy(&type, buffer + TOPIC_LEN, 1);
+                    cout << (int)type << '\n';
+
+                    message received = message(client_addr.sin_addr.s_addr,
+                                                client_addr.sin_port, type,
+                                                topic);
+                    cout << (int)received.type << '\n';
+
+                    // Sent the message to the clients that are
+                    // subscribed to the topic
+                    for (auto &it : topics[topic]) {
+                        if (used_ids[it.first].active == true) {
+                            // Send the message to the client
+                            ret = send_message(used_ids[it.first].fd, (char *) &received, sizeof(received));
+                            cout << ret<< '\n';
+
+                            if (ret < 0) {
+                                cerr << "Sending message to client failed\n";
+                            }
+                        } else {
+                            // Check if store & forward is activated
+                            if (it.second == 1) {
+
+                            }
+                        }
+                    }
                 } else if (i == tcp_sock_fd) {  // connection request
                     client_addr_size = sizeof(client_addr);
                     new_sock_fd = accept(tcp_sock_fd,
@@ -188,33 +228,49 @@ int main(int argc, char *argv[]) {
 
                     // Map the client to the file descriptor associated,
                     // only if the id is not currently used
-                    if (used_ids.find(client_id) == used_ids.end()) {
-                        cout << "New client " << client_id << " connected from "
-                             << inet_ntoa(client_addr.sin_addr) << ":"
-                             << client_addr.sin_port << '\n';
-                        send_message(new_sock_fd, ACC);
+                    if (used_ids.find(client_id) == used_ids.end() || used_ids[client_id].active == false) {
+                        send_message(new_sock_fd, ACC, -1);
 
-                        used_ids[client_id] = client_t(client_id, true, new_sock_fd);
+                        // Check if the client was ever connected to the server,
+                        // and if not create a client_t structure
+                        if (used_ids.find(client_id) == used_ids.end()) {
+                            cout << "New client " << client_id << " connected from "
+                                 << inet_ntoa(client_addr.sin_addr) << ":"
+                                 << client_addr.sin_port << '\n';
+
+                            used_ids[client_id] = client_t(client_id, true, new_sock_fd);
+                        } else {
+                            used_ids[client_id].active = true;
+                            used_ids[client_id].fd = new_sock_fd;
+                        }
+                        
                         clients[new_sock_fd] = client_id;
                     } else {
                         cout << "Client " << client_id << " already connected.\n";
-                        send_message(new_sock_fd, REJ);
+                        send_message(new_sock_fd, REJ, -1);
+
+                        FD_CLR(new_sock_fd, &read_fds);
+                        close(new_sock_fd);
                     }
                 } else {                        // message from a TCP client
                     memset(buffer, 0, BUF_LEN);
-
                     ret = receive_message(i, buffer);
-                    cout << "Ret is: " << ret << '\n';
+
                     if (ret < 0) {
                         cerr << "Receiving data from TCP client failed\n";
                         continue;
                     }
                     
                     if (ret == 0) {
-                        clients.erase(i);
                         cout << "Client disconnected.\n";
                         FD_CLR(i, &read_fds);
-                    } else {
+
+                        used_ids[clients[i]].active = false;
+                        clients.erase(i);
+                        close(i);
+                    } 
+                    
+                    if (ret != 0) {
                         if (!strncmp(buffer, "subscribe", 9)) {
                             pair<string, uint8_t> args = decode_subscribe_msg(buffer);
 

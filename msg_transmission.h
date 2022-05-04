@@ -8,9 +8,13 @@
 // Function that sends a given payload to a server
 // (connection to the server should be established
 //  before calling this function)
-int send_message(int sock_fd, const char *message) {
+// @len - number of bytes that will be sent from message
+//        (-1 if it's the whole message, until '\0')
+int send_message(int sock_fd, const char *message,
+                int len)
+{
     char buffer[BUF_LEN];
-    uint32_t message_len = strlen(message) + 1;
+    uint32_t message_len = (len < 0 ? strlen(message) + 1 : len);
 
     memcpy(buffer, &message_len, MSG_LEN_SIZE);
     snprintf(buffer + MSG_LEN_SIZE, message_len, "%s", message);

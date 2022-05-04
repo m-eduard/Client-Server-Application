@@ -5,7 +5,7 @@
 #define MSG_MAX_LEN		1600
 #define MSG_LEN_SIZE    4           // number of bytes to represent the message length
 #define MAX_CMD_LEN     20
-#define MAX_TOPIC_LEN   50
+#define TOPIC_LEN	   	50
 #define MAX_DATA_LEN 	1500
 #define MAX_ID_LEN      10
 #define ERR             -1
@@ -17,12 +17,13 @@
 
 #define ACC             "ACC"
 #define REJ             "REJ"
+// #define END				"END"
 
 struct message {
     uint32_t ip;
     uint16_t port;
     uint8_t type;
-	char topic[MAX_TOPIC_LEN + 1];
+	char topic[TOPIC_LEN + 1];
 
 	union {
 		struct integer_t {
@@ -42,8 +43,14 @@ struct message {
 	} data;
 
     message() {}
-	message(uint32_t ip, uint16_t port, uint8_t type) :
-		ip(ip), port(port), type(type) {}
+	message(uint32_t ip, uint16_t port, uint8_t type, char *topic) : ip(ip), port(port),
+														type(type) {this->type = type;}
+	// message(uint32_t ip, uint16_t port, uint8_t type,
+	// 		)
+	// {
+	// 	message(ip, port, type);
+	// 	memcpy(this->topic, topic, TOPIC_LEN);
+	// }
 };
 
 #define DIE(assertion, call_description)	\
