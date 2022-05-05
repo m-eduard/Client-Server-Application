@@ -19,32 +19,37 @@
 #define REJ             "REJ"
 // #define END				"END"
 
+// struct __attribute__((packed)) message {
 struct message {
     uint32_t ip;
     uint16_t port;
     uint8_t type;
 	char topic[TOPIC_LEN + 1];
 
-	union {
-		struct integer_t {
-			int8_t sign;
-			uint32_t num;
-		};
+	// union {
+	// 	struct integer_t {
+	// 		int8_t sign;
+	// 		uint32_t num;
+	// 	};
 
-		int16_t short_real_t;
+	// 	int16_t short_real_t;
 
-		struct float_t {
-			int8_t sign;
-			uint32_t decimal;
-			uint8_t fractional;
-		};
+	// 	struct float_t {
+	// 		int8_t sign;
+	// 		uint32_t decimal;
+	// 		uint8_t fractional;
+	// 	};
 
-		char *string_t;
-	} data;
+	// 	char *string_t;
+	// } data;
 
     message() {}
-	message(uint32_t ip, uint16_t port, uint8_t type, char *topic) : ip(ip), port(port),
-														type(type) {this->type = type;}
+	// message(uint32_t ip, uint16_t port, uint8_t type, char *topic) : ip(ip), port(port),
+	// 													type(type) {
+	// 														this->ip = ip;
+	// 														this->port = port;
+	// 														this->type = type;
+	// 														memcpy(this->topic, topic, TOPIC_LEN);}
 	// message(uint32_t ip, uint16_t port, uint8_t type,
 	// 		)
 	// {

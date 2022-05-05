@@ -193,11 +193,21 @@ int main(int argc, char *argv[]) {
                 break;
             }
 
+            std::cout << "\nReceived:\n{";
+            message *inter = (message *)buffer;
+            std::cout << "ip: " << inet_ntoa({inter->ip}) << '\n';
+            std::cout << " port: " << ntohs(inter->port) << '\n';
+            std::cout << " type: " << (int)(inter->type) << '\n';
+            std::cout << " topic: " << inter->topic << '}' << '\n';
+            // if (((message *) buffer)->type == 0) {
+            //     cout << "type: 0";
+            // } else if (((message *) buffer)->type == 1) {
+            //     cout << "type: 1";
+            // } else {
+            //     cout << "undefined type";
+            // }
+
             // cout << parse_server_msg(buffer);
-            cout << inet_ntoa({((message *) buffer)->ip}) << '\n';
-            cout << ((message *) buffer)->port << '\n';
-            cout << (int)(((message *) buffer)->type) << '\n';
-            cout << '$' << '\n';
         }
     }
 

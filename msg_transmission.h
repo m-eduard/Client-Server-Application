@@ -10,18 +10,29 @@
 //  before calling this function)
 // @len - number of bytes that will be sent from message
 //        (-1 if it's the whole message, until '\0')
-int send_message(int sock_fd, const char *message,
+int send_message(int sock_fd, const char *msg,
                 int len)
 {
     char buffer[BUF_LEN];
-    uint32_t message_len = (len < 0 ? strlen(message) + 1 : len);
+    uint32_t msg_len = (len < 0 ? strlen(msg) + 1 : len);
 
-    memcpy(buffer, &message_len, MSG_LEN_SIZE);
-    snprintf(buffer + MSG_LEN_SIZE, message_len, "%s", message);
+    if (len > 0) {
+        std::cout << "\nInterceptated:\n{";
+
+        message *inter = (message *)msg;
+        std::cout << "ip: " << inet_ntoa({inter->ip}) << '\n';
+        std::cout << " port: " << inter->port << '\n';
+        std::cout << " type: " << ('0' + inter->type) << '\n';
+        std::cout << " topic: " << inter->topic << '}' << '\n';
+    }
+
+    memcpy(buffer, &msg_len, MSG_LEN_SIZE);
+    // snprintf(buffer + MSG_LEN_SIZE, msg_len, "%s", msg);
+    memcpy(buffer + MSG_LEN_SIZE, msg, msg_len);
 
     uint32_t current_sent = 0;
-    uint32_t total_len = MSG_LEN_SIZE + message_len;
-    while (current_sent < message_len) {
+    uint32_t total_len = MSG_LEN_SIZE + msg_len;
+    while (current_sent < msg_len) {
         int ret = send(sock_fd, buffer + current_sent,
                         total_len - current_sent, 0);
 

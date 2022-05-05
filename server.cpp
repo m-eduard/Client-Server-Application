@@ -179,18 +179,27 @@ int main(int argc, char *argv[]) {
                     memcpy(&type, buffer + TOPIC_LEN, 1);
                     cout << (int)type << '\n';
 
-                    message received = message(client_addr.sin_addr.s_addr,
-                                                client_addr.sin_port, type,
-                                                topic);
-                    cout << (int)received.type << '\n';
+                    // message received = message(client_addr.sin_addr.s_addr,
+                    //                             client_addr.sin_port, type,
+                    //                             topic);
+                    message received;
+                    received.ip = client_addr.sin_addr.s_addr;
+                    received.port = client_addr.sin_port;
+                    memcpy(received.topic, topic, TOPIC_LEN);
+                    received.type = 2;
+
 
                     // Sent the message to the clients that are
                     // subscribed to the topic
                     for (auto &it : topics[topic]) {
                         if (used_ids[it.first].active == true) {
                             // Send the message to the client
+                            cout << (int)received.type << '\n';
+                            cout << htons(received.port) << '\n';
+                            cout << received.topic << '\n';
+
                             ret = send_message(used_ids[it.first].fd, (char *) &received, sizeof(received));
-                            cout << ret<< '\n';
+                            cout << ret << '\n';
 
                             if (ret < 0) {
                                 cerr << "Sending message to client failed\n";
