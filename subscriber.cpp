@@ -183,7 +183,6 @@ int main(int argc, char *argv[]) {
         
         if (FD_ISSET(sock_fd, &tmp_fds)) {
             memset(buffer, 0, BUF_LEN);
-
             ret = receive_message(sock_fd, buffer);
             DIE(ret < 0, "Receiving server message failed");
             
@@ -193,12 +192,21 @@ int main(int argc, char *argv[]) {
                 break;
             }
 
-            std::cout << "\nReceived:\n{";
-            message *inter = (message *)buffer;
-            std::cout << "ip: " << inet_ntoa({inter->ip}) << '\n';
-            std::cout << " port: " << ntohs(inter->port) << '\n';
-            std::cout << " type: " << (int)(inter->type) << '\n';
-            std::cout << " topic: " << inter->topic << '}' << '\n';
+            message_t *msg = (message_t *)buffer;
+            if (msg->type != STRING) {
+                std::cout << "ip: " << inet_ntoa({msg->ip}) << '\n';
+                std::cout << " port: " << ntohs(msg->port) << '\n';
+                std::cout << " type: " << (int)(msg->type) << '\n';
+                std::cout << " topic: " << msg->topic << '}' << '\n';
+            } else {
+                std::cout << "ip: " << inet_ntoa({msg->ip}) << '\n';
+                std::cout << " port: " << ntohs(msg->port) << '\n';
+                std::cout << " type: " << (int)(msg->type) << '\n';
+                std::cout << " topic: " << msg->topic << '}' << '\n';
+
+                cout << "String: " << buffer + sizeof(*msg) << '\n';
+            }
+
             // if (((message *) buffer)->type == 0) {
             //     cout << "type: 0";
             // } else if (((message *) buffer)->type == 1) {

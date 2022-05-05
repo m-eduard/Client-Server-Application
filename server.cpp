@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
 
     // map every message to the tcp clients to the messages that it has to receive
     // after reconnecting to the server
-    unordered_map<message, vector<client_t>> queued_messages();
+    unordered_map<message_t, vector<client_t>> queued_messages();
 
     // Map of id-s used by the clients that were
     // connected to the server at least once,
@@ -171,35 +171,56 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
 
-                    cout << "Received: " << buffer << '\n';
-
                     char topic[TOPIC_LEN + 1] = {0};
                     memcpy(topic, buffer, TOPIC_LEN);
                     uint8_t type;
                     memcpy(&type, buffer + TOPIC_LEN, 1);
-                    cout << (int)type << '\n';
+                    char data[MAX_DATA_LEN + 1] = {0};
+                    memcpy(data, buffer + TOPIC_LEN + 1, MAX_DATA_LEN);
 
-                    // message received = message(client_addr.sin_addr.s_addr,
-                    //                             client_addr.sin_port, type,
-                    //                             topic);
-                    message received;
-                    received.ip = client_addr.sin_addr.s_addr;
-                    received.port = client_addr.sin_port;
-                    memcpy(received.topic, topic, TOPIC_LEN);
-                    received.type = 2;
+                    message_t received = message_t(client_addr.sin_addr.s_addr,
+                                                    client_addr.sin_port, type,
+                                                    topic, data);
+                    // std::cout << "ip: " << inet_ntoa({client_addr.sin_addr.s_addr}) << '\n';
+                    //             std::cout << " port: " << ntohs(received.port) << '\n';
+                    //             std::cout << " type: " << (int)(received.type) << '\n';
+                    //             std::cout << " topic: " << received.topic << '}' << '\n';
+                    //             cout << "data: " << htonl(received.data.integer_t.num) << "$$$$$\n";
 
-
-                    // Sent the message to the clients that are
+                    // Send the message to the clients that are
                     // subscribed to the topic
                     for (auto &it : topics[topic]) {
+                        cout << "Active clients: " << '\n';
                         if (used_ids[it.first].active == true) {
-                            // Send the message to the client
-                            cout << (int)received.type << '\n';
-                            cout << htons(received.port) << '\n';
-                            cout << received.topic << '\n';
+                            cout << "active -- --- -- \n";
+                            
+                            if (received.type != STRING) {
+                                // Cast the struct containing the message to (char *)
+                                // and send only the structure to the TCP client
+                                ret = send_message(used_ids[it.first].fd, (char *) &received, sizeof(received));
 
-                            ret = send_message(used_ids[it.first].fd, (char *) &received, sizeof(received));
-                            cout << ret << '\n';
+                                std::cout << "ip: " << inet_ntoa({received.ip}) << '\n';
+                                std::cout << " port: " << ntohs(received.port) << '\n';
+                                std::cout << " type: " << (int)(received.type) << '\n';
+                                std::cout << " topic: " << received.topic << '}' << '\n';
+                            } else {
+                                // If the type of the message is STRING, append the actual
+                                // string to the end of the struct, because the struct
+                                // don't contain the string itself, but a pointer to it
+                                memset(buffer, 0, sizeof(buffer));
+                                memcpy(buffer, &received, sizeof(received));
+                                memcpy(buffer + sizeof(received), received.data.string_t, MAX_DATA_LEN);
+
+                                ret = send_message(used_ids[it.first].fd, buffer, sizeof(received) + strlen(received.data.string_t));
+
+                                std::cout << "ip: " << inet_ntoa({received.ip}) << '\n';
+                                std::cout << " port: " << ntohs(received.port) << '\n';
+                                std::cout << " type: " << (int)(received.type) << '\n';
+                                std::cout << " topic: " << received.topic << '}' << '\n';
+
+                                cout << "String: " << buffer + sizeof(received) << '\n';
+                            }
+                            
 
                             if (ret < 0) {
                                 cerr << "Sending message to client failed\n";
