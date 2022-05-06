@@ -1,9 +1,12 @@
 #include <iostream>
+#include <string>
+#include <algorithm>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "utils.h"
 #include "msg_transmission.h"
@@ -49,17 +52,65 @@ string parse_unsubscribe_cmd(char *msg) {
     return string(parsed_msg);
 }
 
-string parse_server_msg(char *msg) {
-    string parsed_msg;
+// Function that prints the message reeceived
+// from the server, in the desired format
+void show_server_msg(char *buffer) {
+    message_t *msg = (message_t *)buffer;
 
-    uint32_t ip;
-    uint16_t port;
+    printf("%s:%d - %s", inet_ntoa({msg->ip}), ntohs(msg->port), msg->topic);
 
-    memcpy(&ip, msg, sizeof(ip));
-    memcpy(&port, msg + sizeof(ip), sizeof(port));
-    
+    switch (msg->type) {
+        case INT:
+            printf(" - %s - %s%d %d", stringify(INT),
+                        sign(msg->data.integer_t.sign),
+                        ntohl(msg->data.integer_t.num),
+                        msg->data.integer_t.sign);
+            break;
+        case SHORT_REAL:
+            printf(" - %s - %d", stringify(SHORT_REAL),
+                        ntohs(msg->data.short_real_t) / 100);
+            
+            // Check fractional part existence
+            if (ntohs(msg->data.short_real_t) % 100 != 0)
+                printf(".%02d", ntohs(msg->data.short_real_t) % 100);
 
-    return parsed_msg;
+            break;
+        case FLOAT: {
+            string num;
+            uint32_t current = ntohl(msg->data.float_t.decimal);
+            int8_t cnt = msg->data.float_t.fractional;
+
+            // Create the float number as string
+            while (current) {
+                num.push_back('0' + current % 10);
+                cnt -= 1;
+
+                if (cnt == 0)
+                    num.push_back('.');
+
+                current /=  10;
+            }
+
+            while (cnt > 0) {
+                num.push_back('0');
+                cnt -= 1;
+
+                if (cnt == 0) {
+                    num.push_back('.');
+                    num.push_back('0');
+                }
+            }
+
+            reverse(num.begin(), num.end());
+
+            printf(" - %s - %s%s", stringify(FLOAT), sign(msg->data.float_t.sign), num.c_str());
+            break;}
+        case STRING:
+            printf(" - %s - %s", stringify(STRING),
+                        buffer + sizeof(*msg));
+    }
+
+    printf("\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -192,30 +243,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
 
-            message_t *msg = (message_t *)buffer;
-            if (msg->type != STRING) {
-                std::cout << "ip: " << inet_ntoa({msg->ip}) << '\n';
-                std::cout << " port: " << ntohs(msg->port) << '\n';
-                std::cout << " type: " << (int)(msg->type) << '\n';
-                std::cout << " topic: " << msg->topic << '}' << '\n';
-            } else {
-                std::cout << "ip: " << inet_ntoa({msg->ip}) << '\n';
-                std::cout << " port: " << ntohs(msg->port) << '\n';
-                std::cout << " type: " << (int)(msg->type) << '\n';
-                std::cout << " topic: " << msg->topic << '}' << '\n';
-
-                cout << "String: " << buffer + sizeof(*msg) << '\n';
-            }
-
-            // if (((message *) buffer)->type == 0) {
-            //     cout << "type: 0";
-            // } else if (((message *) buffer)->type == 1) {
-            //     cout << "type: 1";
-            // } else {
-            //     cout << "undefined type";
-            // }
-
-            // cout << parse_server_msg(buffer);
+            show_server_msg(buffer);
         }
     }
 

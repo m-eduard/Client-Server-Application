@@ -4,10 +4,10 @@ ID = "client"
 
 build: server subscriber
 
-server: server.cpp
+server: server.cpp msg_transmission.h utils.h
 	g++ -std=c++11 server.cpp -o server
 
-subscriber: subscriber.cpp
+subscriber: subscriber.cpp msg_transmission.h utils.h
 	g++ -std=c++11 subscriber.cpp -o subscriber
 
 run_server:

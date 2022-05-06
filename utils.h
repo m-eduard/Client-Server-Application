@@ -22,6 +22,10 @@
 #define ACC             	"ACC"
 #define REJ             	"REJ"
 
+#define stringify(x)		#x
+#define sign(x)				((((x) & 0xff) == (1 & 0xff)) ? "-" : "")
+
+
 struct message_t {
     uint32_t ip;
     uint16_t port;
@@ -61,8 +65,8 @@ struct message_t {
 			case INT:
 				memcpy(tmp, data, INTEGER_T_SZ);
 
-				memcpy(&this->data.integer_t.sign, tmp += 1, 1);
-				memcpy(&this->data.integer_t.num, tmp, 4);
+				memcpy(&this->data.integer_t.sign, tmp, 1);
+				memcpy(&this->data.integer_t.num, tmp + 1, 4);
 
 				break;
 			case SHORT_REAL:
@@ -71,9 +75,9 @@ struct message_t {
 			case FLOAT:
 				memcpy(tmp, data, FLOAT_T_SZ);
 
-				memcpy(&this->data.float_t.sign, tmp += 1, 1);
-				memcpy(&this->data.float_t.decimal, tmp += 4, 4);
-				memcpy(&this->data.float_t.fractional, tmp, 1);
+				memcpy(&this->data.float_t.sign, tmp, 1);
+				memcpy(&this->data.float_t.decimal, tmp + 1, 4);
+				memcpy(&this->data.float_t.fractional, tmp + 5, 1);
 
 				break;
 			case STRING:
