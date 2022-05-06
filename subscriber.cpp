@@ -103,11 +103,12 @@ void show_server_msg(char *buffer) {
 
             reverse(num.begin(), num.end());
 
-            printf(" - %s - %s%s", stringify(FLOAT), sign(msg->data.float_t.sign), num.c_str());
+            printf(" - %s - %s%s", stringify(FLOAT),
+                                   sign(msg->data.float_t.sign),
+                                   num.c_str());
             break;}
         case STRING:
-            printf(" - %s - %s", stringify(STRING),
-                        buffer + sizeof(*msg));
+            printf(" - %s - %s", stringify(STRING), buffer + sizeof(*msg));
     }
 
     printf("\n");

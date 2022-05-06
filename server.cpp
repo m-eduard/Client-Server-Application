@@ -248,13 +248,13 @@ int main(int argc, char *argv[]) {
                     if (used_ids.find(client_id) == used_ids.end() || used_ids[client_id].active == false) {
                         send_message(new_sock_fd, ACC, -1);
 
+                        cout << "New client " << client_id << " connected from "
+                                << inet_ntoa(client_addr.sin_addr) << ":"
+                                << client_addr.sin_port << '\n';
+
                         // Check if the client was ever connected to the server,
                         // and if not create a client_t structure
                         if (used_ids.find(client_id) == used_ids.end()) {
-                            cout << "New client " << client_id << " connected from "
-                                 << inet_ntoa(client_addr.sin_addr) << ":"
-                                 << client_addr.sin_port << '\n';
-
                             used_ids[client_id] = client_t(client_id, true, new_sock_fd);
                         } else {
                             used_ids[client_id].active = true;
@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
                     }
                     
                     if (ret == 0) {
-                        cout << "Client disconnected.\n";
+                        cout << "Client " << clients[i] << " disconnected.\n";
                         FD_CLR(i, &read_fds);
 
                         used_ids[clients[i]].active = false;
