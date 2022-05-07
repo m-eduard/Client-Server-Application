@@ -1,59 +1,20 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <unordered_map>
-#include <unordered_set>
 
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 
-#include <string.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "utils.h"
+#include "msg_parsing.h"
 #include "msg_transmission.h"
 
 using namespace std;
-
-#define HOST_IP     "127.0.0.1"
-
-struct client_t {
-    string id_client;
-    bool active;
-    int fd;
-
-    client_t() {}
-    client_t(string id) : id_client(id), active(true) {}
-    client_t(string id, bool x, int fd) : id_client(id), active(x), fd(fd) {}
-};
-
-pair<string, uint8_t> decode_subscribe_msg(char *msg) {
-    char cmd[MAX_CMD_LEN];
-    char topic[BUF_LEN / 2];
-    uint8_t sf;
-
-    // The @msg containing the command will respect
-    // the format and sscanf will be always successful,
-    // because the @msg was formatted in the TCP client.
-    sscanf(msg, "%s%s%hhd", cmd, topic, &sf);
-
-    return {string(topic), sf};
-}
-
-string decode_unsubscribe_msg(char *msg) {
-    char cmd[MAX_CMD_LEN];
-    char topic[BUF_LEN / 2];
-
-    // The @msg containing the command will respect
-    // the format.
-    sscanf(msg, "%s%s", cmd, topic);
-
-    return string(topic);
-}
 
 int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
@@ -185,12 +146,6 @@ int main(int argc, char *argv[]) {
                                                     client_addr.sin_port, type,
                                                     topic, data);
 
-                    // std::cout << "ip: " << inet_ntoa({client_addr.sin_addr.s_addr}) << '\n';
-                    //             std::cout << " port: " << ntohs(received.port) << '\n';
-                    //             std::cout << " type: " << (int)(received.type) << '\n';
-                    //             std::cout << " topic: " << received.topic << '}' << '\n';
-                    //             cout << "data: " << htonl(received.data.integer_t.num) << "$$$$$\n";
-
                     // Send the message to the clients that are
                     // subscribed to the topic
                     for (auto &it : topics[topic]) {
@@ -304,12 +259,28 @@ int main(int argc, char *argv[]) {
                     
                     if (ret != 0) {
                         if (!strncmp(buffer, "subscribe", 9)) {
-                            pair<string, uint8_t> args = decode_subscribe_msg(buffer);
+                            pair<string, uint8_t> args = parse_subscribe_msg(buffer);
+
+                            if (args.first.size() > 0) {
+                                ret = send_message(i, SUCC_SUBSCRIBE, -1);
+                                DIE(ret < 0, "send_message() failed");
+                            } else {
+                                ret = send_message(i, FAIL, -1);
+                                DIE(ret < 0, "send_message() failed");
+                            }
 
                             // Associate the new topic to the client
                             topics[args.first][clients[i]] = args.second;
                         } else if (!strncmp(buffer, "unsubscribe", 11)) {
-                            string topic = decode_unsubscribe_msg(buffer);
+                            string topic = parse_unsubscribe_msg(buffer);
+
+                            if (topic.size() > 0) {
+                                send_message(i, SUCC_UNSUBSCRIBE, -1);
+                                DIE(ret < 0, "send_message() failed");
+                            } else {
+                                send_message(i, FAIL, -1);
+                                DIE(ret < 0, "send_message() failed");
+                            }
 
                             // Delete the client from the topic's subscribers
                             topics[topic].erase(clients[i]);
@@ -319,9 +290,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (sig_exit) {
+        if (sig_exit)
             break;
-        }
     }
 
     close(tcp_sock_fd);
