@@ -97,25 +97,27 @@ int main(int argc, char *argv[]) {
             ret = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
             DIE(ret < 0, "read() failed");
 
-            if (!strncmp(buffer, "exit", 4)) {
+            if (!strncmp(buffer, "exit", 4))
                 break;
-            }
 
+            // Send the command to the server,
+            // where it will be parsed
             ret = send_message(sock_fd, buffer, -1);
-            if (ret < 0) {
-                cerr << "Sending cmd to server failed\n";
-            } else {
-                ret = receive_message(sock_fd, buffer);
+            DIE(ret < 0, "Sending cmd to server failed");
 
-                if (string(buffer) == SUCC_SUBSCRIBE) {
-                    cout << "Subscribed to topic.\n";
-                } else if (string(buffer) == SUCC_UNSUBSCRIBE) {
-                    cout << "Unsubscribed from topic.\n";
-                } else if (string(buffer) == FAIL) {
-                    cerr << "Wrong format of command\n"
-                         << "Subscribe format: \"subscribe <TOPIC> <SF>\"\n"
-                         << "Unsubscribe format: \"unsubscribe <TOPIC>\"\n";
-                }
+            // Receive an answer from the server,
+            // regarding the validity of the command
+            ret = receive_message(sock_fd, buffer);
+            DIE(ret < 0, "send_message() failed");
+
+            if (string(buffer) == SUCC_SUBSCRIBE) {
+                cout << "Subscribed to topic.\n";
+            } else if (string(buffer) == SUCC_UNSUBSCRIBE) {
+                cout << "Unsubscribed from topic.\n";
+            } else if (string(buffer) == FAIL) {
+                cerr << "Wrong format of command\n"
+                     << "Subscribe format: \"subscribe <TOPIC> <SF>\"\n"
+                     << "Unsubscribe format: \"unsubscribe <TOPIC>\"\n";
             }
         }
         

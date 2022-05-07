@@ -3,6 +3,7 @@
 #include <string>
 #include <cstring>
 #include <unordered_map>
+#include <queue>
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -11,8 +12,8 @@
 #include <unistd.h>
 
 #include "utils.h"
-#include "msg_parsing.h"
 #include "msg_transmission.h"
+#include "msg_parsing.h"
 
 using namespace std;
 
@@ -39,25 +40,22 @@ int main(int argc, char *argv[]) {
     // value:   client ID
     unordered_map<int, string> clients;
 
-    // map every tcp client id to the messages he has to receive
-    // after reconnecting
-    //
-    //message to the tcp clients to the messages that it has to receive
-    // after reconnecting to the server
-    unordered_map<string, vector<message_t>> queued_messages;
+    // key:     client ID
+    // value:   messages a client has to receive
+    //          after reconnecting to the server
+    unordered_map<string, queue<message_t>> queued_messages;
 
-    // Map of id-s used by the clients that were
-    // connected to the server at least once,
-    // associated to their structure
+    // key:     client ID  (for all the clients that were
+    //                      connected at least once)
+    // value:   client_t struct containing data about a client
     unordered_map<string, client_t> used_ids;
 
-    // key:     string representing the topic name
+    // key:     topic name
     // value:   map, where the keys are the clients
     //          subscribed to a specific topic, and
     //          the value is 0/1, according to their
-    //          sf status
+    //          SF status
     unordered_map<string, unordered_map<string, bool>> topics;
-
 
     // Open 2 sockets (one for UDP transmissions,
     // and one for the TCP connections)
@@ -70,9 +68,8 @@ int main(int argc, char *argv[]) {
     int flag = 1;
     int status = setsockopt(tcp_sock_fd, IPPROTO_TCP, TCP_NODELAY,
                             (char *) &flag, sizeof(flag));
-    if (status < 0) {
+    if (status < 0)
         cerr << "Cannot deactivate the Nagle algorithm\n";
-    }
 
     // Check if the provided port is a valid int
     DIE(atoi(argv[1]) == 0, "atoi() failed");
@@ -99,9 +96,10 @@ int main(int argc, char *argv[]) {
     // (current fd-s: tcp_sock_fd and stdin fd)
     FD_ZERO(&read_fds);
     FD_ZERO(&tmp_fds);
-    FD_SET(tcp_sock_fd, &read_fds);
-    FD_SET(udp_sock_fd, &read_fds);
     FD_SET(STDIN_FILENO, &read_fds);
+    FD_SET(udp_sock_fd, &read_fds);
+    FD_SET(tcp_sock_fd, &read_fds);
+    
 	fd_max = max(tcp_sock_fd, udp_sock_fd);
 
     while (true) {
@@ -113,36 +111,34 @@ int main(int argc, char *argv[]) {
 
         // Iterate through file descriptors to see
         // which one received data
-        for (int i = 0; i < fd_max + 1; ++i) {
+        for (int i = 0; i <= fd_max; ++i) {
             if (FD_ISSET(i, &tmp_fds)) {
-                if (i == STDIN_FILENO) {
-                    memset(buffer, 0, sizeof(buffer));
-                    if (read(STDIN_FILENO, buffer, sizeof(buffer) - 1) < 0) {
-                        cerr << "read() failed\n";
-                    }
+                memset(buffer, 0, sizeof(buffer));
+
+                if (i == STDIN_FILENO) {        // message from stdin
+                    ret = read(STDIN_FILENO, buffer, sizeof(buffer) - 1);
+                    DIE(ret < 0, "read() failed");
 
                     if (!strncmp(buffer, "exit", 4)) {
                         sig_exit = true;
                         break;
                     }
                 } else if (i == udp_sock_fd) {  // message from a UDP client
-                    memset(buffer, sizeof(buffer), 0);
                     ret = recvfrom(udp_sock_fd, buffer, sizeof(buffer) - 1, 0,
-                                    (sockaddr *) &client_addr, &client_addr_size);
+                                (sockaddr *) &client_addr, &client_addr_size);
+                    DIE(ret < 0, "Reading from UDP socket failed");
 
-                    if (ret < 0) {
-                        cerr << "Reading from UDP socket failed\n";
-                        continue;
-                    }
-
+                    // Get the content of the UDP message
                     char topic[TOPIC_LEN + 1] = {0};
                     memcpy(topic, buffer, TOPIC_LEN);
                     uint8_t type;
                     memcpy(&type, buffer + TOPIC_LEN, 1);
-                    char data[MAX_DATA_LEN + 1] = {0};
-                    memcpy(data, buffer + TOPIC_LEN + 1, ret - (TOPIC_LEN + 1));
+                    char data[MAX_DATA_LEN + 1] = {0};  // data + ending '\0'
+                    memcpy(data, buffer + TOPIC_LEN + 1,
+                            ret - (TOPIC_LEN + 1));
 
-                    message_t received = message_t(client_addr.sin_addr.s_addr,
+                    // Build the message that will be sent over TCP
+                    message_t udp_msg = message_t(client_addr.sin_addr.s_addr,
                                                     client_addr.sin_port, type,
                                                     topic, data);
 
@@ -150,42 +146,31 @@ int main(int argc, char *argv[]) {
                     // subscribed to the topic
                     for (auto &it : topics[topic]) {
                         if (used_ids[it.first].active == true) {
-                            
-                            if (received.type != STRING) {
-                                // Cast the struct containing the message to (char *)
-                                // and send only the structure to the TCP client
-                                ret = send_message(used_ids[it.first].fd, (char *) &received, sizeof(received));
+                            if (udp_msg.type != STRING) {
+                                // Cast the struct containing the message
+                                // to (char *) and send only the structure
+                                // to the TCP client
+                                ret = send_message(used_ids[it.first].fd,
+                                        (char *) &udp_msg, sizeof(udp_msg));
                             } else {
-                                // If the type of the message is STRING, append the actual
-                                // string to the end of the struct, because the struct
-                                // don't contain the string itself, but a pointer to it
-                                memset(buffer, 0, sizeof(buffer));
-                                memcpy(buffer, &received, sizeof(received));
-                                memcpy(buffer + sizeof(received), received.data.string_t, MAX_DATA_LEN);
-
-                                ret = send_message(used_ids[it.first].fd, buffer, sizeof(received) + strlen(received.data.string_t));
+                                int new_len = format_udp_msg(&udp_msg, buffer);
+                                ret = send_message(used_ids[it.first].fd,
+                                                    buffer, new_len);
                             }
-                            
 
-                            if (ret < 0) {
-                                cerr << "Sending message to client failed\n";
-                            }
+                            DIE(ret < 0, "send_message() failed");
                         } else {
                             // Check if store & forward is activated
-                            if (it.second == 1) {
-                                queued_messages[it.first].push_back(received);
-                            }
+                            if (it.second == 1)
+                                queued_messages[it.first].push(udp_msg);
                         }
                     }
                 } else if (i == tcp_sock_fd) {  // connection request
                     client_addr_size = sizeof(client_addr);
                     new_sock_fd = accept(tcp_sock_fd,
-                                    (sockaddr *) &client_addr, &client_addr_size);
-
-                    if (new_sock_fd < 0) {
-                        cerr << "accept() failed\n";
-                        continue;
-                    }
+                                        (sockaddr *) &client_addr,
+                                        &client_addr_size);
+                    DIE(new_sock_fd < 0, "accept() failed");
 
                     // Add the new file descriptor to the used fd-s set
                     FD_SET(new_sock_fd, &read_fds);
@@ -193,61 +178,58 @@ int main(int argc, char *argv[]) {
 
                     // Get the client ID
                     ret = receive_message(new_sock_fd, buffer);
-                    if (ret < 0) {
-                        cerr << "Skipped new client, since the ID "
-                                "wasn't received\n";
-                        continue;
-                    }
+                    DIE(ret < 0, "receive_message() failed");
 
                     string client_id(buffer);
 
                     // Map the client to the file descriptor associated,
                     // only if the id is not currently used
-                    if (used_ids.find(client_id) == used_ids.end() || used_ids[client_id].active == false) {
+                    if (used_ids[client_id].active == false) {
                         send_message(new_sock_fd, ACC, -1);
 
-                        cout << "New client " << client_id << " connected from "
-                                << inet_ntoa(client_addr.sin_addr) << ":"
-                                << client_addr.sin_port << '\n';
+                        cout << "New client " << client_id << " connected from"
+                             << " " << inet_ntoa(client_addr.sin_addr) << ":"
+                             << client_addr.sin_port << '\n';
 
-                        // Check if the client was ever connected to the server,
-                        // and if not create a client_t structure
+                        // Check if the client was ever connected to the
+                        // server, and if not create a client_t structure
                         if (used_ids.find(client_id) == used_ids.end()) {
-                            used_ids[client_id] = client_t(client_id, true, new_sock_fd);
+                            used_ids[client_id] = client_t(client_id, true,
+                                                            new_sock_fd);
                         } else {
                             used_ids[client_id].active = true;
                             used_ids[client_id].fd = new_sock_fd;
 
-                            for (auto &it : queued_messages[client_id]) {
-                                ret = send_message(used_ids[client_id].fd, (char *) &it, sizeof(it));
+                            // Forward the messages that were queued
+                            // for this client, while it was disconnected
+                            queue<message_t> to_forward =
+                                    queued_messages[client_id];
 
-                                if (ret < 0) {
-                                    cerr << "Sending message to client failed\n";
-                                }
+                            while (!to_forward.empty()) {
+                                message_t current = to_forward.front();
+                                to_forward.pop();
+
+                                int new_len = format_udp_msg(&current, buffer);
+                                ret = send_message(used_ids[client_id].fd,
+                                                    buffer, new_len);
+                                DIE(ret < 0, "send_message() failed");
                             }
-
-                            // Eliminate th current client from the map of clients
-                            // that have to receive some messages upon reconnection
-                            queued_messages.erase(client_id);
                         }
                         
                         clients[new_sock_fd] = client_id;
                     } else {
-                        cout << "Client " << client_id << " already connected.\n";
                         send_message(new_sock_fd, REJ, -1);
+
+                        cout << "Client " << client_id << " already connected."
+                                "\n";
 
                         FD_CLR(new_sock_fd, &read_fds);
                         close(new_sock_fd);
                     }
                 } else {                        // message from a TCP client
-                    memset(buffer, 0, BUF_LEN);
                     ret = receive_message(i, buffer);
+                    DIE(ret < 0, "Receiving data from TCP client failed");
 
-                    if (ret < 0) {
-                        cerr << "Receiving data from TCP client failed\n";
-                        continue;
-                    }
-                    
                     if (ret == 0) {
                         cout << "Client " << clients[i] << " disconnected.\n";
                         FD_CLR(i, &read_fds);
@@ -255,37 +237,41 @@ int main(int argc, char *argv[]) {
                         used_ids[clients[i]].active = false;
                         clients.erase(i);
                         close(i);
+
+                        continue;
                     } 
-                    
-                    if (ret != 0) {
-                        if (!strncmp(buffer, "subscribe", 9)) {
-                            pair<string, uint8_t> args = parse_subscribe_msg(buffer);
 
-                            if (args.first.size() > 0) {
-                                ret = send_message(i, SUCC_SUBSCRIBE, -1);
-                                DIE(ret < 0, "send_message() failed");
-                            } else {
-                                ret = send_message(i, FAIL, -1);
-                                DIE(ret < 0, "send_message() failed");
-                            }
+                    bool valid_cmd = false;
+                    if (!strncmp(buffer, "subscribe", 9)) {
+                        pair<string, uint8_t> args =
+                            parse_subscribe_msg(buffer);
 
+                        if (args.first.size() > 0) {
                             // Associate the new topic to the client
                             topics[args.first][clients[i]] = args.second;
-                        } else if (!strncmp(buffer, "unsubscribe", 11)) {
-                            string topic = parse_unsubscribe_msg(buffer);
 
-                            if (topic.size() > 0) {
-                                send_message(i, SUCC_UNSUBSCRIBE, -1);
-                                DIE(ret < 0, "send_message() failed");
-                            } else {
-                                send_message(i, FAIL, -1);
-                                DIE(ret < 0, "send_message() failed");
-                            }
+                            valid_cmd = true;
+                        }
+                    } else if (!strncmp(buffer, "unsubscribe", 11)) {
+                        string topic = parse_unsubscribe_msg(buffer);
 
+                        if (topic.size() > 0) {
                             // Delete the client from the topic's subscribers
                             topics[topic].erase(clients[i]);
+
+                            valid_cmd = true;
                         }
                     }
+
+                    // Send to the client the command execution status
+                    if (valid_cmd && !strncmp(buffer, "subscribe", 9))
+                        ret = send_message(i, SUCC_SUBSCRIBE, -1);
+                    else if (valid_cmd && !strncmp(buffer, "unsubscribe", 11))
+                        ret = send_message(i, SUCC_UNSUBSCRIBE, -1);
+                    else
+                        ret = send_message(i, FAIL, -1);
+
+                    DIE(ret < 0, "send_message() failed");
                 }
             }
         }

@@ -91,7 +91,7 @@ struct message_t {
 						sizeof(this->data.float_t));
 				break;
 			case STRING:
-				memcpy(tmp, data, MAX_DATA_LEN);
+				memcpy(tmp, data, strlen(data));
 				this->data.string_t = tmp;
 		}
 	}

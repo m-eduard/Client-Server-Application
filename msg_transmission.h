@@ -80,7 +80,7 @@ int receive_message(int sock_fd, char *buffer) {
     // Clear the buffer
     memset(buffer, 0, BUF_LEN);
 
-    // Receive the rest of the message
+    // Receive the rest of the messag
     current_read = 0;
     while (current_read < message_len) {
         ret = recv(sock_fd, buffer + current_read,
@@ -90,9 +90,31 @@ int receive_message(int sock_fd, char *buffer) {
             break;
 
         current_read += ret;
-        ret = current_read;
     }
 
     // Return the length of the actual message
-    return ret;
+    return current_read;
+}
+
+// Format the message received from UDP clients
+// and store it in @buffer, so it can be sent
+// over to the TCP clients (return the size of
+// the message after formatting)
+int format_udp_msg(message_t *msg, char *buffer) {
+    int new_len = sizeof(*msg);
+
+    memset(buffer, 0, sizeof(buffer));
+    memcpy(buffer, msg, sizeof(*msg));
+
+    // Append the actual string to the end of the
+    // struct, because the struct don't contain the
+    // string itself, but a pointer to it
+    if (msg->type == STRING) {
+        int string_len = strlen(msg->data.string_t);
+
+        memcpy(buffer + sizeof(*msg), msg->data.string_t, string_len);
+        new_len += string_len;
+    }
+
+    return new_len;
 }

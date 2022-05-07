@@ -14,7 +14,7 @@ pair<string, uint8_t> parse_subscribe_msg(char *msg) {
 
     // Check if @msg, containing the command, respect
     // the standard format for a subscribe message
-    if (sscanf(msg, "%s%s%hhd", cmd, topic, &sf) != 3)
+    if (sscanf(msg, "%s%s%hhd", cmd, topic, &sf) != 3 || sf > 1)
         return {string(), -1};
 
     return {string(topic), sf};
