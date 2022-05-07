@@ -78,9 +78,12 @@ int main(int argc, char *argv[]) {
     // value:   client ID
     unordered_map<int, string> clients;
 
-    // map every message to the tcp clients to the messages that it has to receive
+    // map every tcp client id to the messages he has to receive
+    // after reconnecting
+    //
+    //message to the tcp clients to the messages that it has to receive
     // after reconnecting to the server
-    unordered_map<message_t, vector<client_t>> queued_messages();
+    unordered_map<string, vector<message_t>> queued_messages;
 
     // Map of id-s used by the clients that were
     // connected to the server at least once,
@@ -176,7 +179,7 @@ int main(int argc, char *argv[]) {
                     uint8_t type;
                     memcpy(&type, buffer + TOPIC_LEN, 1);
                     char data[MAX_DATA_LEN + 1] = {0};
-                    memcpy(data, buffer + TOPIC_LEN + 1, MAX_DATA_LEN);
+                    memcpy(data, buffer + TOPIC_LEN + 1, ret - (TOPIC_LEN + 1));
 
                     message_t received = message_t(client_addr.sin_addr.s_addr,
                                                     client_addr.sin_port, type,
@@ -215,7 +218,7 @@ int main(int argc, char *argv[]) {
                         } else {
                             // Check if store & forward is activated
                             if (it.second == 1) {
-
+                                queued_messages[it.first].push_back(received);
                             }
                         }
                     }
@@ -259,6 +262,18 @@ int main(int argc, char *argv[]) {
                         } else {
                             used_ids[client_id].active = true;
                             used_ids[client_id].fd = new_sock_fd;
+
+                            for (auto &it : queued_messages[client_id]) {
+                                ret = send_message(used_ids[client_id].fd, (char *) &it, sizeof(it));
+
+                                if (ret < 0) {
+                                    cerr << "Sending message to client failed\n";
+                                }
+                            }
+
+                            // Eliminate th current client from the map of clients
+                            // that have to receive some messages upon reconnection
+                            queued_messages.erase(client_id);
                         }
                         
                         clients[new_sock_fd] = client_id;
