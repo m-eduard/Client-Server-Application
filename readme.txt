@@ -1,5 +1,6 @@
 Marin Eduard-Constantin, 321CA
 
+
 *Protocolul de transmitere a datelor peste TCP:
 
 |-- Scop: delimitarea si receptionarea mesajelor integral, atunci cand
@@ -51,16 +52,22 @@ Marin Eduard-Constantin, 321CA
 |  |     a carui semnificatie se va pierde cand va ajunge in client
 |  |___________________________________________________________________________
 |
-|-- serverul trimitand doar datele utile din payload-ul UDP, fara a aplica
-|   vreo procedura de decodare a acestora, in clientii TCP urmeaza sa fie
-|   creat string-ul care va fi afisat la stdout, decodat si formatat conform
-|   regulilor care descriu mesajele trimise de clientii UDP
+|-- serverul va trimite doar datele utile din payload-ul UDP, fara a aplica
+|   vreo procedura de decodare a acestora (de exemplu recrearea unui FLOAT,
+|   folosind byte-ul de semn si partea intreaga/fractionara), deci in clientii
+|   TCP urmeaza sa fie creat string-ul care va fi afisat la stdout, decodat si
+|   formatat conform regulilor care descriu mesajele trimise de clientii UDP
+|   (am decis ca doar clientii TCP sa decodeze datele, deoarece decodarea si
+|    transformarea acestora in string ar putea fi o operatie costisitoare
+|    pentru server, care ar deveni supraincarcat in cazul unui numar foarte
+|    mare de mesaje)
 |______________________________________________________________________________
 
-_________________________________________________________________________
-!! Toate mesajele trimise prin TCP respecta protocolul *, fiind folosite
-functiile de receive_message() / send_message() in locul recv() / send().
-_________________________________________________________________________
+____________________________________________________________________________
+!! Toate mesajele care vor fi trimise mai departe prin TCP vor folosi
+protocolul *, fiind folosite functiile de receive_message() / send_message()
+in locul recv() / send().
+____________________________________________________________________________
 
 
 Subscriber:

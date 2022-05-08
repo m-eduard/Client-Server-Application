@@ -1,3 +1,5 @@
+// Copyright Eduard Marin, 2022
+
 #include <iostream>
 #include <vector>
 #include <string>

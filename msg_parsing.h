@@ -1,11 +1,13 @@
+// Copyright Eduard Marin, 2022
+
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <arpa/inet.h>
 
-using namespace std;
-
 #include "utils.h"
+
+using namespace std;
 
 pair<string, uint8_t> parse_subscribe_msg(char *msg) {
     char cmd[MAX_CMD_LEN] = {0};

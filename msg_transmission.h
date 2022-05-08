@@ -1,3 +1,5 @@
+// Copyright Eduard Marin, 2022
+
 #include "utils.h"
 
 /* Function that sends a given payload to a server
