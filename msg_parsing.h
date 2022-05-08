@@ -8,14 +8,18 @@ using namespace std;
 #include "utils.h"
 
 pair<string, uint8_t> parse_subscribe_msg(char *msg) {
-    char cmd[MAX_CMD_LEN];
-    char topic[TOPIC_LEN + 1];
+    char cmd[MAX_CMD_LEN] = {0};
+    char topic[TOPIC_LEN + 1] = {0};
     uint8_t sf;
 
-    // Check the length of the topic
+    // Check the length of the cmd
     int pos1 = find(msg, msg + strlen(msg), ' ') - msg;
+    if (pos1 > MAX_CMD_LEN)
+        return {string(), -1};
+
+    // Check the length of the topic
     int pos2 = find(msg + pos1 + 1, msg + strlen(msg), ' ') - msg;
-    if (pos2 > TOPIC_LEN)
+    if (pos2 - pos1 - 1 > TOPIC_LEN)
         return {string(), -1};
 
     // Check if @msg, containing the command, respect
@@ -27,13 +31,17 @@ pair<string, uint8_t> parse_subscribe_msg(char *msg) {
 }
 
 string parse_unsubscribe_msg(char *msg) {
-    char cmd[MAX_CMD_LEN];
-    char topic[TOPIC_LEN + 1];
+    char cmd[MAX_CMD_LEN] = {0};
+    char topic[TOPIC_LEN + 1] = {0};
+
+    // Check the length of the cmd
+    int pos1 = find(msg, msg + strlen(msg), ' ') - msg;
+    if (pos1 > MAX_CMD_LEN)
+        return string();
 
     // Check the length of the topic
-    int pos1 = find(msg, msg + strlen(msg), ' ') - msg;
     int pos2 = find(msg + pos1 + 1, msg + strlen(msg), ' ') - msg;
-    if (pos2 > TOPIC_LEN)
+    if (pos2 - pos1 - 1 > TOPIC_LEN)
         return string();
 
     // Check the format of @msg

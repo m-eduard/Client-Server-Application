@@ -22,10 +22,6 @@ using namespace std;
 #define ACC             	"ACC"
 #define REJ             	"REJ"
 
-#define SUCC_SUBSCRIBE		"SUB"
-#define SUCC_UNSUBSCRIBE	"UNSUB"
-#define FAIL				"FAIL"
-
 #define HOST_IP     		"127.0.0.1"
 
 // get the name of the variable

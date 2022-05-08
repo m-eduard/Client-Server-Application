@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     unordered_map<int, string> clients;
 
     // key:     client ID
-    // value:   messages a client has to receive
+    // value:   queue of messages that a client has to receive
     //          after reconnecting to the server
     unordered_map<string, queue<message_t>> queued_messages;
 
@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     } 
 
-                    bool valid_cmd = false;
+                    // Check if the command received is valid
                     if (!strncmp(buffer, "subscribe ", 10)) {
                         pair<string, uint8_t> args =
                             parse_subscribe_msg(buffer);
@@ -249,8 +249,6 @@ int main(int argc, char *argv[]) {
                         if (args.first.size() > 0) {
                             // Associate the new topic to the client
                             topics[args.first][clients[i]] = args.second;
-
-                            valid_cmd = true;
                         }
                     } else if (!strncmp(buffer, "unsubscribe ", 12)) {
                         string topic = parse_unsubscribe_msg(buffer);
@@ -258,20 +256,8 @@ int main(int argc, char *argv[]) {
                         if (topic.size() > 0) {
                             // Delete the client from the topic's subscribers
                             topics[topic].erase(clients[i]);
-
-                            valid_cmd = true;
                         }
                     }
-
-                    // Send to the client the command execution status
-                    if (valid_cmd && !strncmp(buffer, "subscribe ", 10))
-                        ret = send_message(i, SUCC_SUBSCRIBE, -1);
-                    else if (valid_cmd && !strncmp(buffer, "unsubscribe ", 12))
-                        ret = send_message(i, SUCC_UNSUBSCRIBE, -1);
-                    else
-                        ret = send_message(i, FAIL, -1);
-
-                    DIE(ret < 0, "send_message() failed");
                 }
             }
         }

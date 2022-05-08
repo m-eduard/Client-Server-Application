@@ -100,25 +100,35 @@ int main(int argc, char *argv[]) {
             if (!strncmp(buffer, "exit", 4))
                 break;
 
-            // Send the command to the server,
-            // where it will be parsed
-            ret = send_message(sock_fd, buffer, -1);
-            DIE(ret < 0, "Sending cmd to server failed");
+            // Check if the command is valid and send it to the
+            bool valid = false;
+            if (!strncmp(buffer, "subscribe ", 10)) {
+                pair<string, uint8_t> args =
+                    parse_subscribe_msg(buffer);
 
-            // Receive an answer from the server,
-            // regarding the validity of the command
-            ret = receive_message(sock_fd, buffer);
-            DIE(ret < 0, "send_message() failed");
+                if (args.first.size() > 0) {
+                    ret = send_message(sock_fd, buffer, -1);
+                    DIE(ret < 0, "Sending cmd to server failed");
+                    valid = true;
+                }
 
-            if (string(buffer) == SUCC_SUBSCRIBE) {
                 cout << "Subscribed to topic.\n";
-            } else if (string(buffer) == SUCC_UNSUBSCRIBE) {
+            } else if (!strncmp(buffer, "unsubscribe ", 12)) {
+                string topic = parse_unsubscribe_msg(buffer);
+
+                if (topic.size() > 0) {
+                    ret = send_message(sock_fd, buffer, -1);
+                    DIE(ret < 0, "Sending cmd to server failed");
+                    valid = true;
+                }
+
                 cout << "Unsubscribed from topic.\n";
-            } else if (string(buffer) == FAIL) {
+            }
+
+            if (!valid)
                 cerr << "Wrong format of command\n"
                      << "Subscribe format: \"subscribe <TOPIC> <SF>\"\n"
                      << "Unsubscribe format: \"unsubscribe <TOPIC>\"\n";
-            }
         }
         
         if (FD_ISSET(sock_fd, &tmp_fds)) {  // data provided by server

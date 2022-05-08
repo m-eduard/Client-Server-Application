@@ -12,7 +12,7 @@
  *
  * @len - number of bytes that will be sent from @msg
  *        (-1 if it's the whole message, until '\0')
- */
+ * */
 int send_message(int sock_fd, const char *msg, int len) {
     char buffer[BUF_LEN];
 
@@ -40,9 +40,10 @@ int send_message(int sock_fd, const char *msg, int len) {
 }
 
 
-// Function that receives a message, strips it of the header
-// which contains the length and the control byte, and returns
-// the number of bytes read from the message received
+/* Function that receives a message, strips it of the header
+ * which contains the length and the control byte, and returns
+ * the number of bytes read from the message received
+ * */
 int receive_message(int sock_fd, char *buffer) {
     int ret = recv(sock_fd, buffer, 1, 0);
 
@@ -96,10 +97,11 @@ int receive_message(int sock_fd, char *buffer) {
     return current_read;
 }
 
-// Format the message received from UDP clients
-// and store it in @buffer, so it can be sent
-// over to the TCP clients (return the size of
-// the message after formatting)
+/* Format the message received from UDP clients
+ * and store it in @buffer, so it can be sent
+ * over to the TCP clients (return the size of
+ * the message after formatting)
+ * */
 int format_udp_msg(message_t *msg, char *buffer) {
     int new_len = sizeof(*msg);
 
