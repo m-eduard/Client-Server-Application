@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
                     } 
 
                     bool valid_cmd = false;
-                    if (!strncmp(buffer, "subscribe", 9)) {
+                    if (!strncmp(buffer, "subscribe ", 10)) {
                         pair<string, uint8_t> args =
                             parse_subscribe_msg(buffer);
 
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
 
                             valid_cmd = true;
                         }
-                    } else if (!strncmp(buffer, "unsubscribe", 11)) {
+                    } else if (!strncmp(buffer, "unsubscribe ", 12)) {
                         string topic = parse_unsubscribe_msg(buffer);
 
                         if (topic.size() > 0) {
@@ -264,9 +264,9 @@ int main(int argc, char *argv[]) {
                     }
 
                     // Send to the client the command execution status
-                    if (valid_cmd && !strncmp(buffer, "subscribe", 9))
+                    if (valid_cmd && !strncmp(buffer, "subscribe ", 10))
                         ret = send_message(i, SUCC_SUBSCRIBE, -1);
-                    else if (valid_cmd && !strncmp(buffer, "unsubscribe", 11))
+                    else if (valid_cmd && !strncmp(buffer, "unsubscribe ", 12))
                         ret = send_message(i, SUCC_UNSUBSCRIBE, -1);
                     else
                         ret = send_message(i, FAIL, -1);
@@ -280,8 +280,9 @@ int main(int argc, char *argv[]) {
             break;
     }
 
-    close(tcp_sock_fd);
-    close(udp_sock_fd);
+    for (int i = 0; i <= fd_max; ++i)
+        if (FD_ISSET(i, &read_fds))
+            close(i);
 
     return 0;
 }
